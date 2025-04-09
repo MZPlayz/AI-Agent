@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Create AI Agent{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">Create New AI Agent</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Agent Name</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                        <div class="form-text">Give your agent a descriptive name</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="type" class="form-label">Agent Type</label>
+                        <select class="form-select" id="type" name="type" required>
+                            <option value="">Select agent type</option>
+                            <option value="research">Research Agent</option>
+                            <option value="automation">Automation Agent</option>
+                            <option value="analysis">Analysis Agent</option>
+                            <option value="assistant">Assistant Agent</option>
+                            <option value="custom">Custom Agent</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3" required></textarea>
+                        <div class="form-text">Describe what your agent does and its purpose</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Capabilities</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="capabilities" value="web_search" id="web_search">
+                            <label class="form-check-label" for="web_search">
+                                Web Search
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="capabilities" value="data_analysis" id="data_analysis">
+                            <label class="form-check-label" for="data_analysis">
+                                Data Analysis
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="capabilities" value="task_automation" id="task_automation">
+                            <label class="form-check-label" for="task_automation">
+                                Task Automation
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="capabilities" value="natural_language" id="natural_language">
+                            <label class="form-check-label" for="natural_language">
+                                Natural Language Processing
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="configuration" class="form-label">Configuration</label>
+                        <textarea class="form-control" id="configuration" name="configuration" rows="4"></textarea>
+                        <div class="form-text">Enter any specific configuration in JSON format</div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('agents') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to Agents
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Create Agent
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Initialize JSON editor for configuration
+    const configurationTextarea = document.getElementById('configuration');
+    configurationTextarea.value = JSON.stringify({
+        "settings": {},
+        "parameters": {},
+        "constraints": {}
+    }, null, 2);
+</script>
+{% endblock %} 

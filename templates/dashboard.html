@@ -1,47 +1,312 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-12">
-        <h2 class="mb-4">Your Connected Accounts</h2>
-        
-        <div class="row">
-            {% for page in pages %}
-            <div class="col-md-4 mb-4">
-                <div class="card">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="card-title">{{ page.page_name }}</h5>
-                            <i class="fab fa-{{ page.platform }} social-icon"></i>
+<div class="container-fluid py-4">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3 col-lg-2">
+            <div class="card bg-dark border-0 shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-4">
+                        <div class="avatar-circle bg-primary text-white">
+                            {{ current_user.username[0].upper() }}
                         </div>
-                        <p class="card-text">Platform: {{ page.platform }}</p>
-                        <p class="card-text">Connected since: {{ page.created_at.strftime('%Y-%m-%d') }}</p>
-                        <div class="btn-group">
-                            <a href="/post/{{ page.id }}" class="btn btn-primary">Create Post</a>
-                            <a href="/analytics/{{ page.id }}" class="btn btn-info">View Analytics</a>
+                        <div class="ms-3">
+                            <h6 class="mb-0 text-white">{{ current_user.username }}</h6>
+                            <small class="text-muted">{{ current_user.email }}</small>
+                        </div>
+                    </div>
+                    <hr class="border-secondary">
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link text-white-50" href="{{ url_for('dashboard') }}">
+                                <i class="fas fa-home me-2"></i> Overview
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white-50" href="{{ url_for('videos') }}">
+                                <i class="fas fa-video me-2"></i> Videos
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white-50" href="{{ url_for('schedule') }}">
+                                <i class="fas fa-calendar me-2"></i> Schedule
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white-50" href="{{ url_for('analytics') }}">
+                                <i class="fas fa-chart-line me-2"></i> Analytics
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-md-9 col-lg-10">
+            <!-- Quick Stats -->
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card bg-dark border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-0">Total Videos</h6>
+                                    <h3 class="text-white mb-0">{{ total_videos }}</h3>
+                                </div>
+                                <div class="bg-primary bg-opacity-10 rounded-circle p-3">
+                                    <i class="fas fa-video text-primary"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-dark border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-0">Published</h6>
+                                    <h3 class="text-white mb-0">{{ published_videos }}</h3>
+                                </div>
+                                <div class="bg-success bg-opacity-10 rounded-circle p-3">
+                                    <i class="fas fa-check-circle text-success"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-dark border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="text-muted mb-0">Processing</h6>
+                                    <h3 class="text-white mb-0">{{ processing_videos }}</h3>
+                                </div>
+                                <div class="bg-warning bg-opacity-10 rounded-circle p-3">
+                                    <i class="fas fa-spinner text-warning"></i>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            {% endfor %}
+
+            <!-- Recent Videos -->
+            <div class="card bg-dark border-0 shadow-sm mb-4">
+                <div class="card-header bg-transparent border-secondary d-flex justify-content-between align-items-center">
+                    <h5 class="text-white mb-0">Recent Videos</h5>
+                    <a href="{{ url_for('create_video') }}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus me-1"></i> Create Video
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Title</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for video in videos %}
+                                <tr>
+                                    <td>{{ video.title }}</td>
+                                    <td>
+                                        {% if video.status == 'published' %}
+                                            <span class="badge bg-success">Published</span>
+                                        {% elif video.status == 'processing' %}
+                                            <span class="badge bg-warning">Processing</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Failed</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ video.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    <td>
+                                        <a href="{{ url_for('edit_video', video_id=video.id) }}" class="btn btn-sm btn-outline-primary me-2">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="deleteVideo({{ video.id }})">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Social Media Connections -->
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card bg-dark border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="text-white mb-0">Facebook</h6>
+                                {% if facebook_connected %}
+                                    <span class="badge bg-success">Connected</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Not Connected</span>
+                                {% endif %}
+                            </div>
+                            {% if facebook_connected %}
+                                <p class="text-muted small">Page: {{ current_user.facebook_page_id or 'Personal' }}</p>
+                                <button class="btn btn-outline-primary btn-sm w-100" onclick="manageFacebook()">Manage</button>
+                            {% else %}
+                                <p class="text-muted small">Connect your Facebook account</p>
+                                <a href="{{ url_for('connect_facebook') }}" class="btn btn-outline-primary btn-sm w-100">Connect</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-dark border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="text-white mb-0">Instagram</h6>
+                                {% if instagram_connected %}
+                                    <span class="badge bg-success">Connected</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Not Connected</span>
+                                {% endif %}
+                            </div>
+                            {% if instagram_connected %}
+                                <p class="text-muted small">@{{ current_user.instagram_email.split('@')[0] }}</p>
+                                <button class="btn btn-outline-primary btn-sm w-100" onclick="manageInstagram()">Manage</button>
+                            {% else %}
+                                <p class="text-muted small">Connect your Instagram account</p>
+                                <a href="{{ url_for('connect_instagram') }}" class="btn btn-outline-primary btn-sm w-100">Connect</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-dark border-0 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6 class="text-white mb-0">Twitter</h6>
+                                {% if twitter_connected %}
+                                    <span class="badge bg-success">Connected</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Not Connected</span>
+                                {% endif %}
+                            </div>
+                            {% if twitter_connected %}
+                                <p class="text-muted small">@{{ current_user.twitter_email.split('@')[0] }}</p>
+                                <button class="btn btn-outline-primary btn-sm w-100" onclick="manageTwitter()">Manage</button>
+                            {% else %}
+                                <p class="text-muted small">Connect your Twitter account</p>
+                                <a href="{{ url_for('connect_twitter') }}" class="btn btn-outline-primary btn-sm w-100">Connect</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
-<div class="row mt-4">
-    <div class="col-md-12">
-        <h3>Connect New Account</h3>
-        <div class="btn-group">
-            <a href="/connect/twitter" class="btn btn-outline-primary">
-                <i class="fab fa-twitter"></i> Twitter
-            </a>
-            <a href="/connect/facebook" class="btn btn-outline-primary">
-                <i class="fab fa-facebook"></i> Facebook
-            </a>
-            <a href="/connect/instagram" class="btn btn-outline-primary">
-                <i class="fab fa-instagram"></i> Instagram
-            </a>
-        </div>
-    </div>
-</div>
+{% block extra_js %}
+<script>
+function deleteVideo(videoId) {
+    if (confirm('Are you sure you want to delete this video?')) {
+        fetch(`/video/${videoId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert('Error deleting video');
+            }
+        });
+    }
+}
+
+function manageFacebook() {
+    // Implement Facebook management functionality
+    window.location.href = '/manage/facebook';
+}
+
+function manageInstagram() {
+    // Implement Instagram management functionality
+    window.location.href = '/manage/instagram';
+}
+
+function manageTwitter() {
+    // Implement Twitter management functionality
+    window.location.href = '/manage/twitter';
+}
+</script>
+{% endblock %}
+
+<style>
+    body {
+        background-color: #121212;
+        color: #ffffff;
+    }
+    
+    .card {
+        background-color: #1e1e1e;
+        border: 1px solid #2d2d2d;
+    }
+    
+    .nav-link {
+        transition: all 0.3s ease;
+    }
+    
+    .nav-link:hover {
+        color: #ffffff !important;
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: 5px;
+    }
+    
+    .avatar-circle {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+    }
+    
+    .table {
+        color: #ffffff;
+    }
+    
+    .table-hover tbody tr:hover {
+        background-color: rgba(255, 255, 255, 0.05);
+    }
+    
+    .btn-outline-primary {
+        color: #0d6efd;
+        border-color: #0d6efd;
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: #0d6efd;
+        color: #ffffff;
+    }
+    
+    .btn-outline-danger {
+        color: #dc3545;
+        border-color: #dc3545;
+    }
+    
+    .btn-outline-danger:hover {
+        background-color: #dc3545;
+        color: #ffffff;
+    }
+</style>
 {% endblock %} 

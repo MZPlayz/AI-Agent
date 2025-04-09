@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}{{ task.title }}{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1 class="display-4">{{ task.title }}</h1>
+        <p class="text-muted">Task Details and Management</p>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('tasks') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Tasks
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Task Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <h6>Description</h6>
+                    <p>{{ task.description }}</p>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h6>Status</h6>
+                        <span class="badge bg-{{ 
+                            'success' if task.status == 'completed' 
+                            else 'warning' if task.status == 'active' 
+                            else 'danger' if task.status == 'failed' 
+                            else 'secondary' 
+                        }}">
+                            {{ task.status }}
+                        </span>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Priority</h6>
+                        {% for i in range(5) %}
+                        <i class="fas fa-star{{ '' if i < task.priority else '-o' }} text-warning"></i>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h6>Created</h6>
+                        <p>{{ task.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Assigned Agent</h6>
+                        {% if task.agent %}
+                        <span class="badge bg-info">{{ task.agent.name }}</span>
+                        {% else %}
+                        <span class="text-muted">Unassigned</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if task.parameters %}
+                <div class="mb-4">
+                    <h6>Parameters</h6>
+                    <pre class="bg-dark p-3 rounded"><code>{{ task.parameters | tojson(indent=2) }}</code></pre>
+                </div>
+                {% endif %}
+
+                {% if task.results %}
+                <div class="mb-4">
+                    <h6>Results</h6>
+                    <pre class="bg-dark p-3 rounded"><code>{{ task.results | tojson(indent=2) }}</code></pre>
+                </div>
+                {% endif %}
+
+                {% if task.error_message %}
+                <div class="mb-4">
+                    <h6>Error Message</h6>
+                    <div class="alert alert-danger">
+                        {{ task.error_message }}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Task Actions</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" class="mb-3">
+                    {% if task.status == 'pending' %}
+                    <button type="submit" name="action" value="start" class="btn btn-primary w-100 mb-2">
+                        <i class="fas fa-play"></i> Start Task
+                    </button>
+                    {% elif task.status == 'active' %}
+                    <button type="submit" name="action" value="complete" class="btn btn-success w-100 mb-2">
+                        <i class="fas fa-check"></i> Mark as Completed
+                    </button>
+                    <button type="submit" name="action" value="fail" class="btn btn-danger w-100">
+                        <i class="fas fa-times"></i> Mark as Failed
+                    </button>
+                    {% endif %}
+                </form>
+
+                <div class="d-grid gap-2">
+                    <a href="#" class="btn btn-outline-primary">
+                        <i class="fas fa-edit"></i> Edit Task
+                    </a>
+                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteTaskModal">
+                        <i class="fas fa-trash"></i> Delete Task
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Task Timeline</h5>
+            </div>
+            <div class="card-body">
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-marker"></div>
+                        <div class="timeline-content">
+                            <h6>Task Created</h6>
+                            <small class="text-muted">{{ task.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                        </div>
+                    </div>
+                    {% if task.started_at %}
+                    <div class="timeline-item">
+                        <div class="timeline-marker"></div>
+                        <div class="timeline-content">
+                            <h6>Task Started</h6>
+                            <small class="text-muted">{{ task.started_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if task.completed_at %}
+                    <div class="timeline-item">
+                        <div class="timeline-marker"></div>
+                        <div class="timeline-content">
+                            <h6>Task {{ 'Completed' if task.status == 'completed' else 'Failed' }}</h6>
+                            <small class="text-muted">{{ task.completed_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Task Modal -->
+<div class="modal fade" id="deleteTaskModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Delete Task</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this task?</p>
+                <p class="text-danger">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form action="{{ url_for('delete_task', task_id=task.id) }}" method="POST" class="d-inline">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .timeline {
+        position: relative;
+        padding-left: 2rem;
+    }
+
+    .timeline-item {
+        position: relative;
+        padding-bottom: 1.5rem;
+    }
+
+    .timeline-item:last-child {
+        padding-bottom: 0;
+    }
+
+    .timeline-marker {
+        position: absolute;
+        left: -1.5rem;
+        width: 1rem;
+        height: 1rem;
+        border-radius: 50%;
+        background-color: var(--ai-color);
+    }
+
+    .timeline-content {
+        padding-left: 1rem;
+    }
+</style>
+{% endblock %} 

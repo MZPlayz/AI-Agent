@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -10,38 +10,21 @@ from dotenv import load_dotenv
 import facebook
 import instagram_private_api
 import tweepy
+from models import db, User, Agent, Task
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///social_media.db'
-db = SQLAlchemy(app)
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Initialize extensions
+db.init_app(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
 # Load environment variables
 load_dotenv()
-
-class User(UserMixin, db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(200), nullable=False)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    json2video_token = db.Column(db.String(200))
-    # Social Media Credentials
-    facebook_email = db.Column(db.String(120))
-    facebook_password_hash = db.Column(db.String(200))
-    facebook_access_token = db.Column(db.String(200))
-    
-    instagram_email = db.Column(db.String(120))
-    instagram_password_hash = db.Column(db.String(200))
-    instagram_access_token = db.Column(db.String(200))
-    
-    twitter_email = db.Column(db.String(120))
-    twitter_password_hash = db.Column(db.String(200))
-    twitter_access_token = db.Column(db.String(200))
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Video(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -65,8 +48,118 @@ def index():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    user_videos = Video.query.filter_by(user_id=current_user.id).order_by(Video.created_at.desc()).all()
-    return render_template('dashboard.html', videos=user_videos)
+    # Get user's agents
+    agents = Agent.query.filter_by(user_id=current_user.id).all()
+    
+    # Get active tasks
+    active_tasks = Task.query.filter_by(user_id=current_user.id, status='active').all()
+    
+    # Get task statistics
+    total_tasks = Task.query.filter_by(user_id=current_user.id).count()
+    completed_tasks = Task.query.filter_by(user_id=current_user.id, status='completed').count()
+    failed_tasks = Task.query.filter_by(user_id=current_user.id, status='failed').count()
+    
+    return render_template('dashboard.html',
+                         agents=agents,
+                         active_tasks=active_tasks,
+                         total_tasks=total_tasks,
+                         completed_tasks=completed_tasks,
+                         failed_tasks=failed_tasks)
+
+@app.route('/agents')
+@login_required
+def agents():
+    user_agents = Agent.query.filter_by(user_id=current_user.id).all()
+    return render_template('agents.html', agents=user_agents)
+
+@app.route('/agents/create', methods=['GET', 'POST'])
+@login_required
+def create_agent():
+    if request.method == 'POST':
+        name = request.form.get('name')
+        agent_type = request.form.get('type')
+        description = request.form.get('description')
+        
+        new_agent = Agent(
+            name=name,
+            agent_type=agent_type,
+            description=description,
+            user_id=current_user.id
+        )
+        
+        try:
+            db.session.add(new_agent)
+            db.session.commit()
+            flash('Agent created successfully!', 'success')
+            return redirect(url_for('agents'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creating agent: {str(e)}', 'danger')
+    
+    return render_template('create_agent.html')
+
+@app.route('/tasks')
+@login_required
+def tasks():
+    user_tasks = Task.query.filter_by(user_id=current_user.id).order_by(Task.created_at.desc()).all()
+    return render_template('tasks.html', tasks=user_tasks)
+
+@app.route('/tasks/create', methods=['GET', 'POST'])
+@login_required
+def create_task():
+    if request.method == 'POST':
+        title = request.form.get('title')
+        description = request.form.get('description')
+        agent_id = request.form.get('agent_id')
+        
+        new_task = Task(
+            title=title,
+            description=description,
+            agent_id=agent_id,
+            user_id=current_user.id,
+            status='pending'
+        )
+        
+        try:
+            db.session.add(new_task)
+            db.session.commit()
+            flash('Task created successfully!', 'success')
+            return redirect(url_for('tasks'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creating task: {str(e)}', 'danger')
+    
+    agents = Agent.query.filter_by(user_id=current_user.id).all()
+    return render_template('create_task.html', agents=agents)
+
+@app.route('/task/<int:task_id>', methods=['GET', 'POST'])
+@login_required
+def task_detail(task_id):
+    task = Task.query.get_or_404(task_id)
+    if task.user_id != current_user.id:
+        flash('Unauthorized access', 'danger')
+        return redirect(url_for('tasks'))
+    
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'start':
+            task.status = 'active'
+            task.started_at = datetime.utcnow()
+        elif action == 'complete':
+            task.status = 'completed'
+            task.completed_at = datetime.utcnow()
+        elif action == 'fail':
+            task.status = 'failed'
+            task.completed_at = datetime.utcnow()
+        
+        try:
+            db.session.commit()
+            flash(f'Task {action}ed successfully!', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating task: {str(e)}', 'danger')
+    
+    return render_template('task_detail.html', task=task)
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -81,36 +174,36 @@ def register():
         
         # Validate input
         if not all([email, password, confirm_password, username]):
-            flash('All fields are required')
+            flash('All fields are required', 'error')
             return redirect(url_for('register'))
             
         if password != confirm_password:
-            flash('Passwords do not match')
+            flash('Passwords do not match', 'error')
             return redirect(url_for('register'))
             
         if len(password) < 6:
-            flash('Password must be at least 6 characters long')
+            flash('Password must be at least 6 characters long', 'error')
             return redirect(url_for('register'))
             
         if len(username) < 3:
-            flash('Username must be at least 3 characters long')
+            flash('Username must be at least 3 characters long', 'error')
             return redirect(url_for('register'))
         
         # Check if email or username already exists
         if User.query.filter_by(email=email).first():
-            flash('Email already registered')
+            flash('Email already registered', 'error')
             return redirect(url_for('register'))
             
         if User.query.filter_by(username=username).first():
-            flash('Username already taken')
+            flash('Username already taken', 'error')
             return redirect(url_for('register'))
         
         try:
             user = User(
                 email=email,
-                password_hash=generate_password_hash(password),
                 username=username
             )
+            user.set_password(password)
             db.session.add(user)
             db.session.commit()
             
@@ -119,7 +212,7 @@ def register():
             return redirect(url_for('dashboard'))
         except Exception as e:
             db.session.rollback()
-            flash('An error occurred during registration. Please try again.')
+            flash('An error occurred during registration. Please try again.', 'error')
             return redirect(url_for('register'))
     
     return render_template('register.html')
@@ -134,21 +227,22 @@ def login():
         password = request.form.get('password')
         
         if not all([email, password]):
-            flash('Please fill in all fields')
+            flash('Please fill in all fields', 'error')
             return redirect(url_for('login'))
         
         try:
             user = User.query.filter_by(email=email).first()
-            if user and check_password_hash(user.password_hash, password):
+            if user and user.check_password(password):
                 login_user(user)
                 next_page = request.args.get('next')
                 if next_page and url_for('static', filename='') not in next_page:
                     return redirect(next_page)
+                flash('Login successful!', 'success')
                 return redirect(url_for('dashboard'))
             else:
-                flash('Invalid email or password')
+                flash('Invalid email or password', 'error')
         except Exception as e:
-            flash('An error occurred during login. Please try again.')
+            flash('An error occurred during login. Please try again.', 'error')
         
         return redirect(url_for('login'))
     
@@ -236,177 +330,101 @@ def check_video_status(video_id):
 @app.route('/connect/facebook', methods=['GET', 'POST'])
 @login_required
 def connect_facebook():
-    if request.method == 'GET':
-        # Generate OAuth URL for Facebook login
-        oauth_url = f"https://www.facebook.com/v18.0/dialog/oauth?" + \
-                   f"client_id={os.getenv('FACEBOOK_APP_ID')}&" + \
-                   f"redirect_uri={url_for('facebook_callback', _external=True)}&" + \
-                   "scope=pages_show_list,pages_read_engagement,pages_manage_posts"
-        return redirect(oauth_url)
-    
-    return render_template('connect_facebook.html')
-
-@app.route('/facebook/callback')
-@login_required
-def facebook_callback():
-    code = request.args.get('code')
-    if not code:
-        flash('Failed to connect Facebook account.')
-        return redirect(url_for('dashboard'))
-
-    try:
-        # Exchange code for access token
-        token_url = "https://graph.facebook.com/v18.0/oauth/access_token"
-        response = requests.get(token_url, params={
-            'client_id': os.getenv('FACEBOOK_APP_ID'),
-            'client_secret': os.getenv('FACEBOOK_APP_SECRET'),
-            'redirect_uri': url_for('facebook_callback', _external=True),
-            'code': code
-        })
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        page_id = request.form.get('page_id')
         
-        if response.status_code == 200:
-            data = response.json()
-            access_token = data.get('access_token')
+        try:
+            # Initialize Facebook SDK
+            graph = facebook.GraphAPI(version="3.1")
             
-            # Get user info
-            graph = facebook.GraphAPI(access_token=access_token)
-            user_info = graph.get_object('me', fields='id,name,email')
+            # Attempt to login and get access token
+            response = requests.post(
+                "https://graph.facebook.com/v18.0/oauth/access_token",
+                params={
+                    "grant_type": "password",
+                    "client_id": os.getenv('FACEBOOK_APP_ID'),
+                    "client_secret": os.getenv('FACEBOOK_APP_SECRET'),
+                    "username": email,
+                    "password": password
+                }
+            )
             
-            # Store the credentials
-            current_user.facebook_access_token = access_token
-            current_user.facebook_email = user_info.get('email')
-            db.session.commit()
-            
-            flash('Facebook account connected successfully!')
-        else:
-            flash('Failed to get Facebook access token.')
-            
-    except Exception as e:
-        flash(f'Error connecting Facebook account: {str(e)}')
-    
-    return redirect(url_for('dashboard'))
+            if response.status_code == 200:
+                # Store encrypted credentials
+                current_user.encrypt_credentials('facebook', email, password)
+                if page_id:
+                    current_user.facebook_page_id = page_id
+                db.session.commit()
+                flash('Facebook account connected successfully!')
+            else:
+                flash('Failed to connect Facebook account. Please check your credentials.')
+                
+        except Exception as e:
+            flash(f'Error connecting Facebook account: {str(e)}')
+        
+        return redirect(url_for('dashboard'))
+        
+    return render_template('connect_facebook.html')
 
 @app.route('/connect/instagram', methods=['GET', 'POST'])
 @login_required
 def connect_instagram():
-    if request.method == 'GET':
-        # Generate OAuth URL for Instagram login
-        oauth_url = f"https://api.instagram.com/oauth/authorize?" + \
-                   f"client_id={os.getenv('INSTAGRAM_APP_ID')}&" + \
-                   f"redirect_uri={url_for('instagram_callback', _external=True)}&" + \
-                   "scope=basic+public_content&response_type=code"
-        return redirect(oauth_url)
-    
-    return render_template('connect_instagram.html')
-
-@app.route('/instagram/callback')
-@login_required
-def instagram_callback():
-    code = request.args.get('code')
-    if not code:
-        flash('Failed to connect Instagram account.')
-        return redirect(url_for('dashboard'))
-
-    try:
-        # Exchange code for access token
-        token_url = "https://api.instagram.com/oauth/access_token"
-        response = requests.post(token_url, data={
-            'client_id': os.getenv('INSTAGRAM_APP_ID'),
-            'client_secret': os.getenv('INSTAGRAM_APP_SECRET'),
-            'grant_type': 'authorization_code',
-            'redirect_uri': url_for('instagram_callback', _external=True),
-            'code': code
-        })
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
         
-        if response.status_code == 200:
-            data = response.json()
-            access_token = data.get('access_token')
-            user_id = data.get('user_id')
+        try:
+            # Initialize Instagram Private API
+            api = instagram_private_api.Client(
+                username=email,
+                password=password,
+                auto_patch=True,
+                drop_incompat_keys=False
+            )
             
-            # Get user info
-            user_info_url = f"https://graph.instagram.com/v12.0/{user_id}"
-            user_response = requests.get(user_info_url, params={
-                'fields': 'id,username',
-                'access_token': access_token
-            })
+            # If we get here, authentication was successful
+            current_user.encrypt_credentials('instagram', email, password)
+            db.session.commit()
+            flash('Instagram account connected successfully!')
             
-            if user_response.status_code == 200:
-                user_data = user_response.json()
-                current_user.instagram_access_token = access_token
-                current_user.instagram_email = user_data.get('username')
-                db.session.commit()
-                flash('Instagram account connected successfully!')
-            else:
-                flash('Failed to get Instagram user info.')
-        else:
-            flash('Failed to get Instagram access token.')
-            
-    except Exception as e:
-        flash(f'Error connecting Instagram account: {str(e)}')
-    
-    return redirect(url_for('dashboard'))
+        except Exception as e:
+            flash(f'Error connecting Instagram account: {str(e)}')
+        
+        return redirect(url_for('dashboard'))
+        
+    return render_template('connect_instagram.html')
 
 @app.route('/connect/twitter', methods=['GET', 'POST'])
 @login_required
 def connect_twitter():
-    if request.method == 'GET':
-        # Initialize Tweepy OAuth2 client
-        client = tweepy.OAuth2UserHandler(
-            client_id=os.getenv('TWITTER_CLIENT_ID'),
-            client_secret=os.getenv('TWITTER_CLIENT_SECRET'),
-            redirect_uri=url_for('twitter_callback', _external=True),
-            scope=['tweet.read', 'tweet.write', 'users.read']
-        )
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
         
-        # Get authorization URL
-        auth_url = client.get_authorization_url()
-        session['twitter_oauth_state'] = client.state
-        return redirect(auth_url)
-    
-    return render_template('connect_twitter.html')
-
-@app.route('/twitter/callback')
-@login_required
-def twitter_callback():
-    code = request.args.get('code')
-    state = request.args.get('state')
-    
-    if not code or not state or state != session.get('twitter_oauth_state'):
-        flash('Failed to connect Twitter account.')
-        return redirect(url_for('dashboard'))
-
-    try:
-        # Initialize OAuth2 handler
-        client = tweepy.OAuth2UserHandler(
-            client_id=os.getenv('TWITTER_CLIENT_ID'),
-            client_secret=os.getenv('TWITTER_CLIENT_SECRET'),
-            redirect_uri=url_for('twitter_callback', _external=True),
-            scope=['tweet.read', 'tweet.write', 'users.read']
-        )
-        
-        # Get access token
-        access_token = client.fetch_token(code)
-        
-        # Initialize API v2 client
-        twitter_client = tweepy.Client(
-            bearer_token=access_token['access_token']
-        )
-        
-        # Get user info
-        user = twitter_client.get_me()
-        
-        if user.data:
-            current_user.twitter_access_token = access_token['access_token']
-            current_user.twitter_email = user.data.username
+        try:
+            # Initialize Tweepy client
+            auth = tweepy.OAuthHandler(
+                os.getenv('TWITTER_API_KEY'),
+                os.getenv('TWITTER_API_SECRET')
+            )
+            
+            # Use email/password to get access token
+            auth_url = auth.get_authorization_url()
+            session['request_token'] = auth.request_token
+            
+            # Store encrypted credentials
+            current_user.encrypt_credentials('twitter', email, password)
             db.session.commit()
             flash('Twitter account connected successfully!')
-        else:
-            flash('Failed to get Twitter user info.')
             
-    except Exception as e:
-        flash(f'Error connecting Twitter account: {str(e)}')
-    
-    return redirect(url_for('dashboard'))
+        except Exception as e:
+            flash(f'Error connecting Twitter account: {str(e)}')
+        
+        return redirect(url_for('dashboard'))
+        
+    return render_template('connect_twitter.html')
 
 @app.route('/disconnect/<platform>')
 @login_required
@@ -427,6 +445,82 @@ def disconnect_platform(platform):
     db.session.commit()
     flash(f'{platform.title()} account disconnected successfully!')
     return redirect(url_for('dashboard'))
+
+@app.route('/video/<int:video_id>', methods=['DELETE'])
+@login_required
+def delete_video(video_id):
+    video = Video.query.get_or_404(video_id)
+    if video.user_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        db.session.delete(video)
+        db.session.commit()
+        return jsonify({'message': 'Video deleted successfully'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/manage/facebook')
+@login_required
+def manage_facebook():
+    if not current_user.facebook_email or not current_user.facebook_password_hash:
+        flash('Please connect your Facebook account first', 'error')
+        return redirect(url_for('connect_facebook'))
+    return render_template('manage_facebook.html')
+
+@app.route('/manage/instagram')
+@login_required
+def manage_instagram():
+    if not current_user.instagram_email or not current_user.instagram_password_hash:
+        flash('Please connect your Instagram account first', 'error')
+        return redirect(url_for('connect_instagram'))
+    return render_template('manage_instagram.html')
+
+@app.route('/manage/twitter')
+@login_required
+def manage_twitter():
+    if not current_user.twitter_email or not current_user.twitter_password_hash:
+        flash('Please connect your Twitter account first', 'error')
+        return redirect(url_for('connect_twitter'))
+    return render_template('manage_twitter.html')
+
+@app.route('/schedule')
+@login_required
+def schedule():
+    return render_template('schedule.html')
+
+@app.route('/analytics')
+@login_required
+def analytics():
+    # Get task completion statistics
+    tasks = Task.query.filter_by(user_id=current_user.id).all()
+    total_tasks = len(tasks)
+    completed_tasks = sum(1 for t in tasks if t.status == 'completed')
+    failed_tasks = sum(1 for t in tasks if t.status == 'failed')
+    success_rate = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
+    
+    # Get agent performance statistics
+    agents = Agent.query.filter_by(user_id=current_user.id).all()
+    agent_stats = []
+    for agent in agents:
+        agent_tasks = Task.query.filter_by(agent_id=agent.id).all()
+        agent_total = len(agent_tasks)
+        agent_completed = sum(1 for t in agent_tasks if t.status == 'completed')
+        agent_success_rate = (agent_completed / agent_total * 100) if agent_total > 0 else 0
+        agent_stats.append({
+            'agent': agent,
+            'total_tasks': agent_total,
+            'completed_tasks': agent_completed,
+            'success_rate': agent_success_rate
+        })
+    
+    return render_template('analytics.html',
+                         total_tasks=total_tasks,
+                         completed_tasks=completed_tasks,
+                         failed_tasks=failed_tasks,
+                         success_rate=success_rate,
+                         agent_stats=agent_stats)
 
 if __name__ == '__main__':
     with app.app_context():
