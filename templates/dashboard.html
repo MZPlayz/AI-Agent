@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h2 class="mb-4">Your Connected Accounts</h2>
+        
+        <div class="row">
+            {% for page in pages %}
+            <div class="col-md-4 mb-4">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="card-title">{{ page.page_name }}</h5>
+                            <i class="fab fa-{{ page.platform }} social-icon"></i>
+                        </div>
+                        <p class="card-text">Platform: {{ page.platform }}</p>
+                        <p class="card-text">Connected since: {{ page.created_at.strftime('%Y-%m-%d') }}</p>
+                        <div class="btn-group">
+                            <a href="/post/{{ page.id }}" class="btn btn-primary">Create Post</a>
+                            <a href="/analytics/{{ page.id }}" class="btn btn-info">View Analytics</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <h3>Connect New Account</h3>
+        <div class="btn-group">
+            <a href="/connect/twitter" class="btn btn-outline-primary">
+                <i class="fab fa-twitter"></i> Twitter
+            </a>
+            <a href="/connect/facebook" class="btn btn-outline-primary">
+                <i class="fab fa-facebook"></i> Facebook
+            </a>
+            <a href="/connect/instagram" class="btn btn-outline-primary">
+                <i class="fab fa-instagram"></i> Instagram
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %} 

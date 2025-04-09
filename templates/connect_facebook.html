@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body">
+                <h2 class="card-title text-center mb-4">Connect Facebook Account</h2>
+                
+                {% with messages = get_flashed_messages() %}
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-info">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
+                <form method="POST" action="{{ url_for('connect_facebook') }}">
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Facebook Email</label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Facebook Password</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                        <div class="form-text text-muted">
+                            Your credentials are securely encrypted and only used to connect to Facebook.
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="page_id" class="form-label">Facebook Page ID (Optional)</label>
+                        <input type="text" class="form-control" id="page_id" name="page_id">
+                        <div class="form-text text-muted">
+                            If you want to manage a Facebook Page, enter its ID here.
+                        </div>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Connect Facebook</button>
+                    </div>
+                </form>
+                
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-link">Back to Dashboard</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

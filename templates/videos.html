@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>Your Videos</h2>
+            <a href="{{ url_for('create_video') }}" class="btn btn-primary">Create New Video</a>
+        </div>
+        
+        {% if videos %}
+            <div class="row">
+                {% for video in videos %}
+                    <div class="col-md-4 mb-4">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ video.title }}</h5>
+                                <p class="card-text">
+                                    Status: <span class="badge {% if video.status == 'completed' %}bg-success{% elif video.status == 'processing' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                        {{ video.status }}
+                                    </span>
+                                </p>
+                                <p class="card-text">
+                                    Created: {{ video.created_at.strftime('%Y-%m-%d %H:%M') }}
+                                </p>
+                                {% if video.status == 'completed' and video.video_url %}
+                                    <div class="d-grid gap-2">
+                                        <a href="{{ video.video_url }}" class="btn btn-primary" target="_blank">
+                                            <i class="fas fa-play me-2"></i>Watch Video
+                                        </a>
+                                        <button class="btn btn-outline-primary share-btn" data-video-url="{{ video.video_url }}">
+                                            <i class="fas fa-share me-2"></i>Share
+                                        </button>
+                                    </div>
+                                {% elif video.status == 'processing' %}
+                                    <div class="text-center">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2">Processing video...</p>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center">
+                <p class="lead">You haven't created any videos yet.</p>
+                <a href="{{ url_for('create_video') }}" class="btn btn-primary">Create Your First Video</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-refresh status for processing videos
+    const processingVideos = document.querySelectorAll('.card');
+    processingVideos.forEach(card => {
+        if (card.querySelector('.badge').textContent.trim() === 'processing') {
+            const videoId = card.dataset.videoId;
+            setInterval(() => {
+                fetch(`/check_video_status/${videoId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'completed') {
+                            location.reload();
+                        }
+                    });
+            }, 5000);
+        }
+    });
+    
+    // Share button functionality
+    const shareButtons = document.querySelectorAll('.share-btn');
+    shareButtons.forEach(button => {
+        button.addEventListener('click', () => {
+            const videoUrl = button.dataset.videoUrl;
+            navigator.clipboard.writeText(videoUrl).then(() => {
+                alert('Video URL copied to clipboard!');
+            });
+        });
+    });
+});
+</script>
+{% endblock %} 

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <h2 class="card-title text-center mb-4">Create Video</h2>
+                
+                {% with messages = get_flashed_messages() %}
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-info">{{ message }}</div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
+                <form method="POST" action="{{ url_for('create_video') }}">
+                    <div class="mb-3">
+                        <label for="title" class="form-label">Video Title</label>
+                        <input type="text" class="form-control" id="title" name="title" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="template_data" class="form-label">Video Template (JSON)</label>
+                        <textarea class="form-control" id="template_data" name="template_data" rows="10" required>
+{
+    "scenes": [
+        {
+            "duration": 5,
+            "elements": [
+                {
+                    "type": "text",
+                    "text": "Your Text Here",
+                    "style": {
+                        "fontSize": 50,
+                        "color": "#ffffff",
+                        "position": {
+                            "x": "center",
+                            "y": "center"
+                        }
+                    }
+                }
+            ],
+            "background": {
+                "color": "#000000"
+            }
+        }
+    ]
+}</textarea>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Create Video</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-body">
+                <h4>Template Help</h4>
+                <p>You can create videos using JSON templates. Here are some examples:</p>
+                <ul>
+                    <li>Text overlay</li>
+                    <li>Image transitions</li>
+                    <li>Background music</li>
+                    <li>Custom animations</li>
+                </ul>
+                <p>For more information, check the <a href="https://json2video.com/docs" target="_blank">JSON2Video documentation</a>.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
